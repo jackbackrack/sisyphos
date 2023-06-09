@@ -58,7 +58,8 @@ public pcb-module module :
   net net-DI (DI, l.DI)
   net net-DO (DO, l.DO)
   via-pad-trace(net-VCC, Point(0.0, 0.0), l, l.VCC)
-  layer(Silkscreen("f-silk", Top)) = Circle(Point(2.75, -2.75), 0.5)
+  ; layer(Silkscreen("f-silk", Top)) = Circle(Point(2.75, -2.75), 0.5)
+  layer(Silkscreen("f-silk", Top)) = Polygon([Point(2.85, -2.75), Point(2.85, -2.1), Point(2.2, -2.75)])
 
 
 

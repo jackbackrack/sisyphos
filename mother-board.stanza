@@ -1,0 +1,160 @@
+#use-added-syntax(jitx)
+defpackage main :
+  import core
+  import math
+  import geom/vec
+  import jitx
+  import jitx/commands
+  import ocdb/utils/generic-components
+  import helpers
+  import components/led-ws2812b
+
+pcb-module cord :
+  pin GND
+  pin VCC
+  pin DI
+  pin DO
+  inst header : pin-header(4)
+  place(header) at loc(0.0, 0.0) on Top
+  net (GND, header.p[1])
+  net (VCC, header.p[4])
+  net (DI, header.p[2])
+  net (DO, header.p[3])
+  val c = 2.54
+  layer(Silkscreen("f-silk", Top)) = 
+    Union $ [ Text("+", c, W, loc(2.0, -1.5 * c)), Text("DO", c, W, loc(2.0, -0.5 * c)), Text("DI", c, W, loc(2.0, 0.5 * c)), Text("-", c, W, loc(2.0, 1.5 * c)) ]
+
+
+pcb-module central-face-design :
+  val num = 8
+  inst leds : components/led-ws2812b/module[num * num]
+
+  val x-step = face-board-width / to-double(num)
+  val y-step = face-board-height / to-double(num)
+  val x-base = -0.5 * face-board-width + 0.5 * x-step
+  val y-base = -0.5 * face-board-height + 0.5 * y-step
+ 
+  defn indices-to-point (i:Double, j:Double) -> Point :
+    warp(Point(x-base + to-double(i) * x-step, y-base + to-double(j) * y-step))
+
+  for j in 0 to num do :
+    for i in 0 to num do :
+      place(leds[j * num + i]) at loc(indices-to-point(to-double(i), to-double(j)), orientation(i, j)) on Top
+
+  ; val order = to-tuple $ zigzag(num)
+  ; val order = to-tuple $ for j in 0 to num seq-cat : for i in 0 to num seq : V2i(i, j)
+  val n2 = num / 2
+  val order = to-tuple $ cat-all $ [ 
+    seq({ _             + V2i(n2, n2) } zigzag(n2, n2))
+    seq({ rotate(_, n2) + V2i(0,  n2) } zigzag(n2, n2))
+    seq({ rotate(_, n2) + V2i(0,  0) }  zigzag(n2, n2))
+    seq({ _             + V2i(n2, 0) }  zigzag(n2, n2)) 
+    ]
+
+  inst screw-holes : mounting-hole(1.5, 2.5, 2.5)[4]
+  place(screw-holes[0]) at loc(indices-to-point(0.5, 0.5)) on Top
+  place(screw-holes[1]) at loc(indices-to-point(0.5, to-double(num) - 1.5)) on Top
+  place(screw-holes[2]) at loc(indices-to-point(to-double(num) - 1.5, to-double(num) - 1.5)) on Top
+  place(screw-holes[3]) at loc(indices-to-point(to-double(num) - 1.5, 0.5)) on Top
+  
+  inst header : cord
+
+  place(header) at loc(0.0, 0.0, 90.0) on Bottom
+
+  for i in 0 to length(order) - 1 do :
+    val p0 = leds[index(order[i + 0], num)]
+    val p1 = leds[index(order[i + 1], num)]
+    net (p0.DO, p1.DI)
+  net (header.DI, leds[index(order[0], num)].DI)
+  net (header.DO, leds[index(order[length(order) - 1], num)].DO)
+  net GND (header.GND)
+  net VCC (header.VCC)
+  for i in 0 to length(order) do :
+    net GND (leds[i].GND)
+    net VCC (leds[i].VCC)
+
+  ; Write the board version on silkscreen
+  inst version-label  : ocdb/artwork/board-text/version-silkscreen("Version 0.0")
+  place(version-label) at loc(warp(Point(0.0, face-board-height / 2.0 - 1.0))) on Bottom
+  geom(GND) :
+    copper-pour(LayerIndex(0), isolate = 0.13, rank = 0) = face-board-shape 
+  geom(VCC) :
+    copper-pour(LayerIndex(1), isolate = 0.13, rank = 0) = face-board-shape 
+
+val mother-board-shape = Rectangle(50.0, 55.0)
+val mother-board-height = height(mother-board-shape)
+val mother-board-width = width(mother-board-shape)
+
+pcb-module mother-design :
+  val w = 4
+  val h = 3
+  inst headers : cord[w * h]
+
+  val x-step = mother-board-width / to-double(w + 1)
+  val y-step = mother-board-height / to-double(h + 1)
+  val x-base = -0.5 * mother-board-width + 1.0 * x-step
+  val y-base = -0.5 * mother-board-height + 1.0 * y-step
+ 
+  defn indices-to-point (i:Double, j:Double) -> Point :
+    Point(x-base + to-double(i) * x-step, y-base + to-double(j) * y-step)
+
+  for j in 0 to h do :
+    for i in 0 to w do :
+      val pt = indices-to-point(to-double(i), to-double(j))
+      place(headers[j * w + i]) at loc(pt, orientation(i, j)) on Top
+  
+  val order = to-tuple $ zigzag(w, h)
+  println(order)
+
+  for (v in order, i in 0 to false) do :
+      val pt = indices-to-point(to-double(x(v)), to-double(y(v)))
+      layer(Silkscreen("f-silk", Top)) = Text(to-string(i), 2.0, C, loc(pt - Point(0.0, 6.5), 0.0))
+
+  inst screw-holes : mounting-hole(1.5, 2.5, 2.5)[4]
+  val w2 = mother-board-width * 0.5 - 4.0
+  val h2 = mother-board-height * 0.5 - 4.0
+  place(screw-holes[0]) at loc(-1.0 * w2, -1.0 * h2) on Top
+  place(screw-holes[1]) at loc(-1.0 * w2,  1.0 * h2) on Top
+  place(screw-holes[2]) at loc( 1.0 * w2,  1.0 * h2) on Top
+  place(screw-holes[3]) at loc( 1.0 * w2, -1.0 * h2) on Top
+  
+  net GND ()
+  net VCC ()
+
+  for i in 0 to length(order) - 1 do :
+    val p0 = headers[index(order[i + 0], w)]
+    val p1 = headers[index(order[i + 1], w)]
+    net (p0.DO, p1.DI)
+  for i in 0 to length(order) do :
+    net GND (headers[i].GND)
+    net VCC (headers[i].VCC)
+
+  ; Write the board version on silkscreen
+  inst version-label  : ocdb/artwork/board-text/version-silkscreen("Version 0.0")
+  place(version-label) at loc(Point(0.0, mother-board-height / 2.0 - 1.0)) on Bottom
+  geom(GND) :
+    copper-pour(LayerIndex(0), isolate = 0.13, rank = 0) = mother-board-shape 
+  geom(VCC) :
+    copper-pour(LayerIndex(1), isolate = 0.13, rank = 0) = mother-board-shape 
+
+
+efn mother-board () :
+  ; Set the design name - a directory with this name will be generated under the "designs" directory
+  set-current-design("mother-design")
+  
+  ; Set the schematic sheet size
+  set-paper(ANSI-A)
+  
+  ; Setup the board properties
+  setup-board(mother-board-shape)
+  
+  ; Set the top level module (the module to be compile into a schematic and PCB)
+  set-main-module(mother-design)
+  
+  ; View the results
+  view-board()
+  ; view-schematic()
+  ; view-design-explorer()
+  export-a-design()
+
+; mother-board()

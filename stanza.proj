@@ -1,0 +1,5 @@
+include "open-components-database/stanza.proj"
+package main defined-in "main.stanza"
+package helpers defined-in "helpers.stanza"
+package components/led-ws2812b defined-in "led-ws2812b.stanza"
+package pad-utils defined-in "pad-utils.stanza"

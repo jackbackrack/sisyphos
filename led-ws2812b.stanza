@@ -1,0 +1,67 @@
+; When renaming the stanza package name below, also rename it in the folder stanza.proj
+; See docs.jitx.com for help
+#use-added-syntax(jitx)
+defpackage components/led-ws2812b:
+  import core
+  import collections
+  import jitx
+  import jitx/commands
+  import ocdb/utils/defaults
+  import ocdb/utils/landpatterns
+  ; import ocdb/utils/tolerance
+  import ocdb/utils/box-symbol
+  import ocdb/utils/bundles
+  import pad-utils
+
+pcb-landpattern lp-led-ws2812b :
+  make-n-pin-soic-landpattern(number-of-leads, pitch, lead-span, package-length,
+      package-width, terminal-length, terminal-width) where :
+    val number-of-leads = 4
+    val pitch = 4.2 - 0.9
+    val lead-span = tol(5.0, 0.15)
+    val package-length = tol(5.0, 0.2)
+    val package-width = tol(5.0, 0.35)
+    val terminal-length = tol(0.9, 0.15),
+    val terminal-width = tol(0.9, 0.01)
+
+public pcb-component component :
+  name = "led-ws2812b"
+  description = "5V SMD LED, Daisy chained LED"
+  ; mpn = "WS2812Bv5"
+  mpn = "C2874885"
+  manufacturer = "World Semi"
+  reference-prefix = "D"
+
+  pin-properties :
+    [pin:Ref      | pads:Int ... | side:Dir ]
+    [VCC          | 1            | Up       ]
+    [GND          | 3            | Down     ]
+    [DI           | 4            | Left     ]
+    [DO           | 2            | Right    ]
+   
+  make-box-symbol()
+  assign-landpattern(lp-led-ws2812b)
+
+  supports power:
+    power.vdd => self.VCC
+    power.gnd => self.GND
+
+public pcb-module module :
+  pin VCC
+  pin GND
+  pin DI
+  pin DO
+  inst l : component
+  place(l) at loc(0.0, 0.0) on Top
+  net net-VCC (VCC, l.VCC)
+  net net-GND (GND, l.GND)
+  net net-DI (DI, l.DI)
+  net net-DO (DO, l.DO)
+  via-pad-trace(net-VCC, Point(0.0, 0.0), l, l.VCC)
+  layer(Silkscreen("f-silk", Top)) = Circle(Point(2.75, -2.75), 0.5)
+
+
+
+; Visualize the symbol and landpattern in the VSCode visualizer.
+; Remove before use of the component in a design
+; view(component)

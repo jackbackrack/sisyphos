@@ -1,0 +1,51 @@
+#use-added-syntax(jitx)
+defpackage pad-utils :
+  import core
+  import collections
+  import utils/seqable
+  import jitx
+  import jitx/commands
+  import ocdb/utils/defaults
+  import ocdb/utils/landpatterns
+  import ocdb/utils/box-symbol
+  import ocdb/utils/bundles
+
+public defn pose-of-pad (c:JITXObject, cpin:JITXObject) -> Pose :
+  val component-def = instance-definition(c)
+  val landpattern-def = landpattern(component-def)
+  val landpattern-pads = pads(landpattern-def)
+  val pad-idx = property(cpin.pads)[0]
+  val pad-ref = Ref("p")[pad-idx]
+  val pad = label<JITXObject|False> return :
+    for pad in landpattern-pads do :
+      if ref(pad) == pad-ref : return(pad)
+  pose(pad as JITXObject)
+
+public defn poses-of-pads (c:JITXObject, cpin:JITXObject) -> Seqable<Pose> :
+  val component-def = instance-definition(c)
+  val landpattern-def = landpattern(component-def)
+  val landpattern-pads = pads(landpattern-def)
+  generate<Pose> :
+    for pad-idx in property(cpin.pads) do :
+      val pad-ref = Ref("p")[pad-idx]
+      for pad in landpattern-pads do :
+        if ref(pad) == pad-ref :
+          yield(pose(pad))
+
+public defn via-pad-trace (net:JITXObject, pt:Point, c:JITXObject, cpin:JITXObject) :
+  inside pcb-module :
+    geom(net) :
+      ; copper(LayerIndex(0)) = Line(1.0, [center(pose-of-pad(c, cpin)), pt])
+      via(LayerIndex(0), LayerIndex(1), hole-radius = 0.25, radius = 0.5) at pt
+
+public defn pad-pad-trace (net:JITXObject, c1:JITXObject, cpin1:JITXObject, c2:JITXObject, cpin2:JITXObject) :
+  inside pcb-module :
+    geom(net) :
+      copper(LayerIndex(0)) = Line(1.0, [center(pose-of-pad(c1, cpin1)), center(pose-of-pad(c2, cpin2))])
+
+public defn pads-trace (net:JITXObject, c:JITXObject, cpin:JITXObject) :
+  inside pcb-module :
+    geom(net) :
+      for [src, dst] in successive-pairs(poses-of-pads(c, cpin)) do:
+        copper(LayerIndex(0)) = Line(1.0, [center(src), center(dst)])
+
